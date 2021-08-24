@@ -1,44 +1,36 @@
 const blogsRouter = require('express').Router();
 const Blog = require('../models/blog');
 
-blogsRouter.get('/', (request, response) => {
-  Blog
-    .find({})
-    .then(blogs => {
-      response.json(blogs);
-    });
+blogsRouter.get('/', async (request, response) => {
+  const blogs = await Blog.find({});
+  if (blogs) response.json(blogs);
+  else response.status(404).end();
 });
 
-blogsRouter.get('/:id', (request, response) => {
-  Blog
-    .findById(request.params.id)
-    .then((blog) => response.json(blog));
+blogsRouter.get('/:id', async (request, response) => {
+  const blog = await Blog.findById(request.params.id);
+  if (blog) response.json(blog);
+  else response.status(404).end();
 });
 
-blogsRouter.post('/', (request, response) => {
-  const { title, author, url, likes } = request.body;
+blogsRouter.post('/', async (request, response) => {
+  let { title, author, url, likes } = request.body;
   const blog = new Blog({ title, author, url, likes });
-
-  blog
-    .save()
-    .then(result => {
-      response.status(201).json(result);
-    });
+  const res = await blog.save();
+  response.status(201).json(res);
 });
 
-blogsRouter.put('/:id', (request, response) => {
+blogsRouter.put('/:id', async (request, response) => {
   const { title, author, url, likes } = request.body;
   const blog = { title, author, url, likes };
 
-  Blog
-    .findByIdAndUpdate(request.params.id, blog, { new: true, runValidators: true, context: 'query' })
-    .then((updated) => response.json(updated));
+  const res = await Blog.findByIdAndUpdate(request.params.id, blog, { new: true, runValidators: true, context: 'query' });
+  response.json(res);
 });
 
-blogsRouter.delete('/:id', (request, response) => {
-  Blog
-    .findByIdAndDelete(request.params.id)
-    .then(() => response.status(204).end());
+blogsRouter.delete('/:id', async (request, response) => {
+  await Blog.findByIdAndDelete(request.params.id);
+  response.status(204).end();
 });
 
 module.exports = blogsRouter;
