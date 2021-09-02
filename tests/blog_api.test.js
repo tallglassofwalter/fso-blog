@@ -4,15 +4,36 @@ const { initialBlogs, nonExistingId, blogsInDb } = require('./test_helper');
 const app = require('../app');
 const api = supertest(app);
 const Blog = require('../models/blog');
+const User = require('../models/user');
+
+let authToken = '';
 
 beforeEach(async () => {
   await Blog.deleteMany({});
   const blogObjects = initialBlogs.map((el) => new Blog(el));
   const promiseArr = blogObjects.map((el) => el.save());
+
+  await User.deleteMany({});
+  const testUser = {
+    username: 'user',
+    name: 'user name',
+    password: 'password'
+  };
+
+  await api
+    .post('/api/users')
+    .send(testUser);
+
+  const loginResponse = await api
+    .post('/api/login')
+    .send({ username: testUser.username, password: testUser.password });
+
+  authToken = `Bearer ${loginResponse.body.token}`;
+
   await Promise.all(promiseArr);
 });
 
-describe('initial data in database', () => {
+describe('initial blog data saved in database', () => {
   test('blogs are returned as json', async () => {
     await api
       .get('/api/blogs')
@@ -70,13 +91,13 @@ describe('post a new blog', () => {
   test('a valid blog can be added', async () => {
     const newBlog = {
       title: 'title',
-      author: 'author',
       url: 'urlofnewblog',
       likes: 0
     };
 
     await api
       .post('/api/blogs')
+      .set('Authorization', authToken)
       .send(newBlog)
       .expect(201)
       .expect('Content-Type', /application\/json/);
@@ -91,11 +112,11 @@ describe('post a new blog', () => {
   test('a blog without `likes` property will be set to 0 likes', async () => {
     const newBlog = {
       title: 'title1',
-      author: 'anon',
       url: 'uniqueurl1'
     };
     await api
       .post('/api/blogs')
+      .set('Authorization', authToken)
       .send(newBlog)
       .expect(201)
       .expect('Content-Type', /application\/json/);
@@ -107,35 +128,50 @@ describe('post a new blog', () => {
 
   test('blog without a title and url is not added', async () => {
     const newBlog = {
-      author: 'author',
       likes: 0
     };
     await api
       .post('/api/blogs')
+      .set('Authorization', authToken)
       .send(newBlog)
       .expect(400);
 
     const blogsAtEnd = await blogsInDb();
     expect(blogsAtEnd).toHaveLength(initialBlogs.length);
   });
-});
 
-describe('delete a note', () => {
-  test('a blog can be deleted', async () => {
-    const blogsAtStart = await blogsInDb();
-    const blogToDelete = blogsAtStart[0];
+  test('a request without a valid token fails', async () => {
+    const newBlog = {
+      title: 'title',
+      url: 'www.url.com',
+      likes: 8
+    };
 
     await api
-      .delete(`/api/blogs/${blogToDelete.id}`)
-      .expect(204);
-
-    const blogsAtEnd = await blogsInDb();
-    expect(blogsAtEnd).toHaveLength(initialBlogs.length - 1);
-
-    const urls = blogsAtEnd.map((el) => el.url);
-    expect(urls).not.toContain(blogToDelete.url);
+      .post('/api/blogs')
+      .set('Authorization', '')
+      .send(newBlog)
+      .expect(401);
   });
 });
+
+// describe('delete a note', () => {
+//   test('a blog can be deleted', async () => {
+//     const blogsAtStart = await blogsInDb();
+//     const blogToDelete = blogsAtStart[0];
+
+//     await api
+//       .delete(`/api/blogs/${blogToDelete.id}`)
+//       .set('Authorization', authToken)
+//       .expect(204);
+
+//     const blogsAtEnd = await blogsInDb();
+//     expect(blogsAtEnd).toHaveLength(initialBlogs.length - 1);
+
+//     const urls = blogsAtEnd.map((el) => el.url);
+//     expect(urls).not.toContain(blogToDelete.url);
+//   });
+// });
 
 afterAll(() => {
   mongoose.connection.close();
