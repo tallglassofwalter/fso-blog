@@ -17,10 +17,10 @@ blogsRouter.get('/:id', async (request, response) => {
 });
 
 blogsRouter.post('/', userExtractor, async (request, response) => {
-  let { title, url, likes } = request.body;
+  let { title, author, url, likes } = request.body;
   const user = request.user;
 
-  const blog = new Blog({ title, url, likes, user: user._id });
+  const blog = new Blog({ title, author, url, likes, user: user._id });
   const res = await blog.save();
   user.blogs = user.blogs.concat(res._id);
   await user.save();
